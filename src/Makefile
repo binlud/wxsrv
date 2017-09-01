@@ -1,8 +1,9 @@
 GCC=g++
+CC=gcc
 
 INCLUDEDIR= -I../lib/include64/ -I../../3rd-srv/include/
 
-LIBDIR= -L../lib/lib64/ -l crypto -l tinyxml2 -lfcgi
+LIBDIR= -L../lib/lib64/ -lcrypto -ltinyxml2 -lfcgi -lpthread
 
 CPPFLAGS = -g -W -Wall
 
@@ -15,8 +16,11 @@ clean:
 	rm -f *.o
 	rm -f ../bin/wx-srv
 
-wx-srv : $(OBJS)
+wx-srv : thpool.o $(OBJS)
 	$(GCC) -o $@ $^ $(LIBDIR) $(INCLUDEDIR)
+
+%.o : %.c
+	$(CC) -lpthread $< -c -g
 
 %.o	: %.cpp
 	$(GCC) $(LIBDIR) $(CPPFLAGS) -c $< -o $@ $(INCLUDEDIR) -g

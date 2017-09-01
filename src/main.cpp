@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <fcgi_stdio.h>
 #include <fcgiapp.h>
+#include <signal.h>
+#include "thpool.h"
 #include "WXBizMsgCrypt.h"
 #include "log.hpp"
 #include "utils.hpp"
@@ -23,7 +25,7 @@ using namespace std;
 *tinyxml2的版本号是tinyxml2-2.1.0,    https://github.com/leethomason/tinyxml2
 */
 
-bool accept(unsigned int &req_count)
+void accept(void *thpool)
 {
 #if 0
     string sEncodingAesKey = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
@@ -71,6 +73,7 @@ bool accept(unsigned int &req_count)
     cout<<sEncryptMsg<<endl;
 
 #endif
+
     while(FCGI_Accept() >= 0) {
 
         char *p = NULL;
@@ -86,6 +89,8 @@ bool accept(unsigned int &req_count)
         SYSERR_LOG("CONTENT_LENGTH = [%s]", p);
 
         if (strcasecmp(pRequestMethod,"POST")==0) {
+
+            //thpool_add_work(thpool, accept, (void*)thpool);
             FCGI_fread(cBuf, len, 1, stdin );
             //string tmp = "{\"fa\":\" OK the method is POST!\"}";
             SYSERR_LOG("req = [%s]", cBuf);
@@ -124,7 +129,7 @@ bool accept(unsigned int &req_count)
                 FCGI_printf("Content-type: text/html charset=utf-8\r\n\r\n");
                 FCGI_printf(res["echostr"].c_str());
 
-                return 0;
+     //           return ;
             }
 
             SYSERR_LOG("Validation failure");
@@ -137,19 +142,48 @@ bool accept(unsigned int &req_count)
             //FCGI_printf("REMOTE_ADDR: %s</br>", getenv("REMOTE_ADDR"));
         }
 
+        //TODO 
     }
 
 
-    return 0;
+    //return ;
 }
+
+/*
+void stop(int signum,siginfo_t *info,void *myact) 
+{
+    SYSERR_LOG("ctra===============");
+    thpool_destroy((thpool_ *)info);
+}
+*/
 
 int main()
 {
-    unsigned int req_count = 0;
     initLog( "../log/wx-srv.log", "test" );
     SYSERR_LOG("init seccess ok");
 
-    accept(req_count);
+	threadpool thpool = thpool_init(4);
+    /*
+    struct sigaction act;
+    union sigval mysigval;
+    mysigval.sival_ptr = thpool;
+    act.sa_flags = SA_SIGINFO;
+    act.sa_sigaction = stop;
+
+    sigaction(SIGINT,&act,NULL);
+    //sigemptyset(&)
+    */
+
+
+    //创建4个生产者线程和cpu核数保持一致
+    thpool_add_work(thpool, accept, (void*)thpool);
+    thpool_add_work(thpool, accept, (void*)thpool);
+    thpool_add_work(thpool, accept, (void*)thpool);
+    thpool_add_work(thpool, accept, (void*)thpool);
+
+    thpool_wait(thpool);
+	thpool_destroy(thpool);
+    //accept();
 
     return 0;
 }
